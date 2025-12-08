@@ -10,11 +10,12 @@ class Command(BaseCommand):
     help = "Ensure there is at least one azure_data_test record for current UTC day. Usage: python manage.py ensure_today"
 
     def handle(self, *args, **options):
-        # Use actual user IDs from Supabase
+        # Use actual user IDs and device names from Supabase
         VALID_USER_IDS = [
             "e185e548-7301-45d4-9bb0-e89d489da851",
             "ca610bad-8b30-44ee-8953-9bdc9cd646f5"
         ]
+        VALID_DEVICE_IDS = ["device-001", "device-002", "device-003"]
         
         now = datetime.now(timezone.utc)
         today_start = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
@@ -39,7 +40,7 @@ class Command(BaseCommand):
             "round_void_count": float(f"{random.uniform(0, 20):.2f}"),
             "slim_void_count": float(f"{random.uniform(0, 20):.2f}"),
             "enqueued_at": dt.isoformat(),
-            "azure_device_id": f"device-{random.randint(1,10)}"
+            "azure_device_id": random.choice(VALID_DEVICE_IDS)
         }
         try:
             ins = supabase.table(TABLE).insert(payload).execute()
