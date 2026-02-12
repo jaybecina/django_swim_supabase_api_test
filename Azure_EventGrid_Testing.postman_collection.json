@@ -1,0 +1,387 @@
+{
+  "info": {
+    "_postman_id": "azure-eventgrid-test-001",
+    "name": "Azure Event Grid - Supabase Edge Function Testing",
+    "description": "Test collection for Azure IoT Hub Event Grid integration with Supabase Edge Function",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "supabase_url",
+      "value": "https://your-project-ref.supabase.co",
+      "type": "string"
+    },
+    {
+      "key": "function_path",
+      "value": "/functions/v1/azure-stream-data",
+      "type": "string"
+    },
+    {
+      "key": "bearer_token",
+      "value": "your-supabase-access-token-here",
+      "type": "string"
+    },
+    {
+      "key": "webhook_id",
+      "value": "31621620-ee99-465a-b917-fc568d2a7add",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Azure Validation Event",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has validationResponse\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('validationResponse');",
+              "    pm.expect(jsonData.validationResponse).to.eql('test-validation-code-123');",
+              "});",
+              "",
+              "console.log(\"✅ Validation test passed\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "aeg-webhook-id",
+            "value": "{{webhook_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"2d1781af-3a4c-4d7c-bd0c-e34b19da4e66\",\n    \"topic\": \"/subscriptions/test-subscription\",\n    \"subject\": \"\",\n    \"data\": {\n      \"validationCode\": \"test-validation-code-123\",\n      \"validationUrl\": \"https://example.com/validate\"\n    },\n    \"eventType\": \"Microsoft.EventGrid.SubscriptionValidationEvent\",\n    \"eventTime\": \"2026-02-11T12:00:00Z\",\n    \"metadataVersion\": \"1\",\n    \"dataVersion\": \"1\"\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{supabase_url}}{{function_path}}",
+          "host": ["{{supabase_url}}{{function_path}}"]
+        },
+        "description": "Tests the Azure Event Grid subscription validation handshake. The edge function should return the validationCode in the response."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Azure Telemetry Event (Basic)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response is authenticated\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.authenticated).to.be.true;",
+              "});",
+              "",
+              "pm.test(\"Response has decoded data\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('decoded');",
+              "    pm.expect(jsonData.decoded.deviceId).to.eql('TestDevice-001');",
+              "    pm.expect(jsonData.decoded.state.totalRoundCount).to.eql(5);",
+              "});",
+              "",
+              "pm.test(\"Message indicates success\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('successfully');",
+              "});",
+              "",
+              "console.log(\"✅ Telemetry test passed\");",
+              "console.log(\"Decoded payload:\", pm.response.json().decoded);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "aeg-webhook-id",
+            "value": "{{webhook_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"test-telemetry-001\",\n    \"topic\": \"/SUBSCRIPTIONS/test-sub/RESOURCEGROUPS/test-rg/PROVIDERS/MICROSOFT.DEVICES/IOTHUBS/test-hub\",\n    \"subject\": \"devices/TestDevice-001\",\n    \"eventType\": \"Microsoft.Devices.DeviceTelemetry\",\n    \"data\": {\n      \"properties\": {},\n      \"systemProperties\": {\n        \"iothub-content-type\": \"application/json\",\n        \"iothub-content-encoding\": \"utf-8\",\n        \"iothub-connection-device-id\": \"TestDevice-001\",\n        \"iothub-enqueuedtime\": \"2026-02-11T12:00:00Z\",\n        \"iothub-message-source\": \"Telemetry\"\n      },\n      \"body\": \"eyJkZXZpY2VJZCI6IlRlc3REZXZpY2UtMDAxIiwidXRjIjoiMjAyNi0wMi0xMVQxMjowMDowMFoiLCJzdGF0ZSI6eyJzY2hlbWFWZXJzaW9uIjoxLCJ0b3RhbFJvdW5kQ291bnQiOjUsInRvdGFsU2xpbUNvdW50IjozLCJ0b3RhbFZvaWRSb3VuZE1sIjo1MDAsInRvdGFsVm9pZFNsaW1NbCI6MjUwfX0=\"\n    },\n    \"dataVersion\": \"\",\n    \"metadataVersion\": \"1\",\n    \"eventTime\": \"2026-02-11T12:00:00Z\"\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{supabase_url}}{{function_path}}",
+          "host": ["{{supabase_url}}{{function_path}}"]
+        },
+        "description": "Sends a test telemetry event with device data. The base64 body decodes to:\n```json\n{\n  \"deviceId\": \"TestDevice-001\",\n  \"utc\": \"2026-02-11T12:00:00Z\",\n  \"state\": {\n    \"schemaVersion\": 1,\n    \"totalRoundCount\": 5,\n    \"totalSlimCount\": 3,\n    \"totalVoidRoundMl\": 500,\n    \"totalVoidSlimMl\": 250\n  }\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Azure Telemetry Event (Real Sample)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response is authenticated\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.authenticated).to.be.true;",
+              "});",
+              "",
+              "pm.test(\"Device ID matches\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.decoded.deviceId).to.eql('Device-cdafcbc0b106');",
+              "});",
+              "",
+              "console.log(\"✅ Real sample telemetry test passed\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "aeg-webhook-id",
+            "value": "{{webhook_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"9425838c-acf3-0686-553b-e1dd312fab91\",\n    \"topic\": \"/SUBSCRIPTIONS/7548AB99-9A3A-4FEF-A1E0-7D3E9C3761DD/RESOURCEGROUPS/PERSONALRESOURCEGROUP/PROVIDERS/MICROSOFT.DEVICES/IOTHUBS/PERSONALOTHUB\",\n    \"subject\": \"devices/Device-cdafcbc0b106\",\n    \"eventType\": \"Microsoft.Devices.DeviceTelemetry\",\n    \"data\": {\n      \"properties\": {},\n      \"systemProperties\": {\n        \"iothub-content-type\": \"application/json\",\n        \"iothub-content-encoding\": \"utf-8\",\n        \"iothub-connection-device-id\": \"Device-cdafcbc0b106\",\n        \"iothub-connection-auth-method\": \"{\\\"scope\\\":\\\"device\\\",\\\"type\\\":\\\"sas\\\",\\\"issuer\\\":\\\"iothub\\\"}\",\n        \"iothub-connection-auth-generation-id\": \"123455432199234570\",\n        \"iothub-enqueuedtime\": \"2026-02-07T05:47:34.36Z\",\n        \"iothub-message-source\": \"Telemetry\"\n      },\n      \"body\": \"eyJkZXZpY2VJZCI6IkRldmljZS1jZGFmY2JjMGIxMDYiLCJ1dGMiOiIyMDI2LTAyLTA3VDA1OjQ3OjM0WiIsInN0YXRlIjp7InNjaGVtYVZlcnNpb24iOjEsInRvdGFsUm91bmRDb3VudCI6MCwidG90YWxTbGltQ291bnQiOjAsInRvdGFsVm9pZFJvdW5kTWwiOjM4NiwidG90YWxWb2lkU2xpbU1sIjowfX0=\"\n    },\n    \"dataVersion\": \"\",\n    \"metadataVersion\": \"1\",\n    \"eventTime\": \"2026-02-07T05:47:34.36Z\"\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{supabase_url}}{{function_path}}",
+          "host": ["{{supabase_url}}{{function_path}}"]
+        },
+        "description": "This is the actual sample from your Azure IoT Hub. The base64 body decodes to:\n```json\n{\n  \"deviceId\": \"Device-cdafcbc0b106\",\n  \"utc\": \"2026-02-07T05:47:34Z\",\n  \"state\": {\n    \"schemaVersion\": 1,\n    \"totalRoundCount\": 0,\n    \"totalSlimCount\": 0,\n    \"totalVoidRoundMl\": 386,\n    \"totalVoidSlimMl\": 0\n  }\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "4. Test Missing Auth Header (Should Fail)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test(\"Error message mentions Authorization\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.error).to.include('Authorization');",
+              "});",
+              "",
+              "console.log(\"✅ Auth validation working correctly\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "aeg-webhook-id",
+            "value": "{{webhook_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"test-001\",\n    \"eventType\": \"Microsoft.Devices.DeviceTelemetry\",\n    \"data\": {\n      \"body\": \"eyJkZXZpY2VJZCI6IlRlc3QifQ==\"\n    }\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{supabase_url}}{{function_path}}",
+          "host": ["{{supabase_url}}{{function_path}}"]
+        },
+        "description": "Tests that the function properly rejects requests without Authorization header."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Test Missing Webhook ID (Should Fail)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test(\"Error message mentions webhook id\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.error).to.include('aeg-webhook-id');",
+              "});",
+              "",
+              "console.log(\"✅ Webhook ID validation working correctly\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"test-001\",\n    \"eventType\": \"Microsoft.Devices.DeviceTelemetry\",\n    \"data\": {\n      \"body\": \"eyJkZXZpY2VJZCI6IlRlc3QifQ==\"\n    }\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{supabase_url}}{{function_path}}",
+          "host": ["{{supabase_url}}{{function_path}}"]
+        },
+        "description": "Tests that the function properly rejects requests without aeg-webhook-id header."
+      },
+      "response": []
+    },
+    {
+      "name": "6. Test Invalid Token (Should Fail)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 401\", function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test(\"Error indicates invalid token\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.error).to.include('token');",
+              "});",
+              "",
+              "console.log(\"✅ Token validation working correctly\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "invalid-token-12345",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "aeg-webhook-id",
+            "value": "{{webhook_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"test-001\",\n    \"eventType\": \"Microsoft.Devices.DeviceTelemetry\",\n    \"data\": {\n      \"systemProperties\": {\n        \"iothub-connection-device-id\": \"TestDevice\",\n        \"iothub-enqueuedtime\": \"2026-02-11T12:00:00Z\"\n      },\n      \"body\": \"eyJkZXZpY2VJZCI6IlRlc3QiLCJ1dGMiOiIyMDI2LTAyLTExVDEyOjAwOjAwWiIsInN0YXRlIjp7InNjaGVtYVZlcnNpb24iOjEsInRvdGFsUm91bmRDb3VudCI6MCwidG90YWxTbGltQ291bnQiOjAsInRvdGFsVm9pZFJvdW5kTWwiOjAsInRvdGFsVm9pZFNsaW1NbCI6MH19\"\n    }\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{supabase_url}}{{function_path}}",
+          "host": ["{{supabase_url}}{{function_path}}"]
+        },
+        "description": "Tests that the function properly rejects requests with invalid Bearer token."
+      },
+      "response": []
+    }
+  ]
+}
