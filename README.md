@@ -70,6 +70,7 @@ The API will be available at `http://127.0.0.1:8000/`
 ### API Endpoints
 
 #### REST API
+
 - `GET /api/azure-data/` - List all Azure data records
 - `POST /api/azure-data/` - Create a new record
 - `GET /api/azure-data/<id>/` - Retrieve a specific record
@@ -77,6 +78,7 @@ The API will be available at `http://127.0.0.1:8000/`
 - `DELETE /api/azure-data/<id>/` - Delete a specific record
 
 #### API Documentation
+
 - `GET /swagger/` - Interactive Swagger UI documentation
 - `GET /redoc/` - ReDoc API documentation
 
