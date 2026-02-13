@@ -45,32 +45,79 @@ class AzureDataListCreate(APIView):
     @swagger_auto_schema(
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
+            required=['azure_device_id', 'round_count', 'slim_count', 'round_void_count', 'slim_void_count', 'enqueued_at'],
             properties={
-                'device_id': openapi.Schema(type=openapi.TYPE_INTEGER, example=1),
-                'round_count': openapi.Schema(type=openapi.TYPE_INTEGER, example=12),
-                'slim_count': openapi.Schema(type=openapi.TYPE_INTEGER, example=8),
-                'round_void_count': openapi.Schema(type=openapi.TYPE_NUMBER, example=45.50),
-                'slim_void_count': openapi.Schema(type=openapi.TYPE_NUMBER, example=22.30),
-                'enqueued_at': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_DATETIME, example="2026-02-12T14:35:00.000Z"),
-                'azure_device_id': openapi.Schema(type=openapi.TYPE_STRING, example="device-pool-001"),
-                'raw_payload': openapi.Schema(type=openapi.TYPE_OBJECT, example={"state": {"totalRoundCount": 12}}),
+                'azure_device_id': openapi.Schema(type=openapi.TYPE_STRING, description='Azure IoT Hub device ID'),
+                'round_count': openapi.Schema(type=openapi.TYPE_INTEGER, description='Total round count from device'),
+                'slim_count': openapi.Schema(type=openapi.TYPE_INTEGER, description='Total slim count from device'),
+                'round_void_count': openapi.Schema(type=openapi.TYPE_NUMBER, description='Total void round in mL'),
+                'slim_void_count': openapi.Schema(type=openapi.TYPE_NUMBER, description='Total void slim in mL'),
+                'enqueued_at': openapi.Schema(type=openapi.TYPE_STRING, format='date-time', description='Timestamp (ISO 8601)'),
+                'raw_payload': openapi.Schema(type=openapi.TYPE_OBJECT, description='Raw device payload (optional)')
             },
-            required=['device_id', 'round_count', 'slim_count', 'round_void_count', 'slim_void_count', 'enqueued_at', 'azure_device_id']
+            example={
+                "azure_device_id": "Device-0004",
+                "round_count": 42,
+                "slim_count": 18,
+                "round_void_count": 15.73,
+                "slim_void_count": 8.91,
+                "enqueued_at": "2026-02-13T14:30:00Z",
+                "raw_payload": {
+                    "round_count": 42,
+                    "slim_count": 18,
+                    "round_void_count": 15.73,
+                    "slim_void_count": 8.91,
+                    "timestamp": "2026-02-13T14:30:00Z",
+                    "device_status": "active"
+                }
+            }
         ),
-        operation_description="Create Azure Data record",
-        responses={201: AzureDataSerializer}
+        operation_description="Create Azure Data record (device_id is auto-populated by looking up azure_device_id)",
+        responses={
+            201: openapi.Response(
+                description="Successfully created",
+                schema=AzureDataSerializer
+            ),
+            404: openapi.Response(description="Device not found"),
+            400: openapi.Response(description="Validation error")
+        }
     )
     def post(self, request):
         serializer = AzureDataSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Extract azure_device_id to lookup device
+        azure_device_id = serializer.validated_data.get('azure_device_id')
+        
+        # Lookup device by azure_device_id (like edge function does)
+        try:
+            device_lookup = supabase.table("devices").select("id").eq("azure_device_id", azure_device_id).single().execute()
+            
+            if getattr(device_lookup, "error", None) or not device_lookup.data:
+                return Response(
+                    {"error": f"Device not found: {azure_device_id}"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            device_id = device_lookup.data['id']
+        except Exception as e:
+            # Handle case where .single() throws an error when 0 or >1 rows returned
+            return Response(
+                {"error": f"Device not found: {azure_device_id}"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Prepare payload with device_id
         payload = serialize_payload(serializer.validated_data)
-        # Remove raw_payload if it exists (not in Supabase table yet)
-        payload.pop('raw_payload', None)
+        payload['device_id'] = device_id
+        
         res = supabase.table(TABLE).insert(payload).execute()
-        # DEBUG: return the raw response object if error
+        
         if getattr(res, "error", None):
-            # include res.status_code or res.error if available
-            return Response({"supabase_error": str(res.error), "raw": getattr(res, "data", None)}, status=400)
+            return Response(
+                {"supabase_error": str(res.error), "raw": getattr(res, "data", None)}, 
+                status=400
+            )
         return Response(res.data[0], status=status.HTTP_201_CREATED)
 
 class AzureDataDetail(APIView):

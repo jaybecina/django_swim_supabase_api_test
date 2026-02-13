@@ -24,7 +24,7 @@ Query parameters:
 [
   {
     "id": 1,
-    "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "device_id": "550e8400-e29b-41d4-a716-446655440000",
     "round_count": 5,
     "slim_count": 3,
     "round_void_count": "10.50",
@@ -45,7 +45,6 @@ Query parameters:
 
 ```json
 {
-  "device_id": 1,
   "round_count": 12,
   "slim_count": 8,
   "round_void_count": 45.5,
@@ -58,24 +57,27 @@ Query parameters:
 
 **Required Fields:**
 
-- `device_id` (integer, e.g., `1`, `2`, `100` - must exist in devices table)
 - `round_count` (integer, e.g., `5`, `12`, `100`)
 - `slim_count` (integer, e.g., `3`, `8`, `50`)
 - `round_void_count` (decimal number, e.g., `10.5`, `45.50`, NOT `"10.5"`)
 - `slim_void_count` (decimal number, e.g., `8.2`, `22.30`, NOT `"8.2"`)
 - `enqueued_at` (ISO 8601 datetime, e.g., `"2026-02-12T14:35:00.000Z"` - use current date/time)
-- `azure_device_id` (string, e.g., `"device-pool-001"`)
+- `azure_device_id` (string, e.g., `"device-pool-001"` - must exist in devices table)
 
 **Optional Fields:**
 
 - `raw_payload` (JSON object with device telemetry data)
+
+**Auto-Populated Fields (do not send):**
+
+- `device_id` (UUID, auto-populated by looking up the device via `azure_device_id`)
 
 **Response (201 Created):**
 
 ```json
 {
   "id": 1,
-  "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "device_id": "550e8400-e29b-41d4-a716-446655440000",
   "round_count": 5,
   "slim_count": 3,
   "round_void_count": "10.50",
@@ -96,7 +98,7 @@ Query parameters:
 ```json
 {
   "id": 1,
-  "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "device_id": "550e8400-e29b-41d4-a716-446655440000",
   "round_count": 5,
   "slim_count": 3,
   "round_void_count": "10.50",
@@ -112,14 +114,14 @@ Query parameters:
 
 **PUT** `/api/azure-data/<id>/`
 
-**Request Body:** Same as POST (all required fields must be provided)
+**Request Body:** Same as POST (all required fields must be provided, except `device_id`)
 
 **Response:**
 
 ```json
 {
   "id": 1,
-  "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "device_id": "550e8400-e29b-41d4-a716-446655440000",
   "round_count": 10,
   "slim_count": 5,
   "round_void_count": "20.50",
@@ -178,7 +180,6 @@ Query parameters:
 curl -X POST 'http://localhost:8000/api/azure-data/' \
   -H 'Content-Type: application/json' \
   -d '{
-    "device_id": 1,
     "round_count": 12,
     "slim_count": 8,
     "round_void_count": 45.50,
@@ -206,7 +207,6 @@ curl -X GET 'http://localhost:8000/api/azure-data/1/'
 curl -X PUT 'http://localhost:8000/api/azure-data/1/' \
   -H 'Content-Type: application/json' \
   -d '{
-    "device_id": 1,
     "round_count": 20,
     "slim_count": 15,
     "round_void_count": 75.25,
@@ -275,6 +275,22 @@ curl -X DELETE 'http://localhost:8000/api/azure-data/1/'
 
 **Solution:** Include all required fields in your request body.
 
+### 404 Not Found - "Device not found"
+
+```json
+{
+  "error": "Device not found: device-pool-001"
+}
+```
+
+**Problem:** The device with the specified `azure_device_id` doesn't exist in the devices table.
+
+**Solution:**
+
+1. Check that the `azure_device_id` you're sending matches a device in Supabase
+2. Create the device first in the devices table if it doesn't exist
+3. Use the exact `azure_device_id` that exists in your devices table
+
 ### 404 Not Found
 
 ```json
@@ -301,15 +317,15 @@ curl -X DELETE 'http://localhost:8000/api/azure-data/1/'
 
 ## Data Types Reference
 
-| Field              | Type        | Format                       | Example                      | Notes                                 |
-| ------------------ | ----------- | ---------------------------- | ---------------------------- | ------------------------------------- |
-| `id`               | Integer     | Auto-generated               | `1`                          | Read-only                             |
-| `device_id`        | Integer     | Device ID from devices table | `1`                          | Required, must exist in devices table |
-| `round_count`      | Integer     | Whole number                 | `5`                          |                                       |
-| `slim_count`       | Integer     | Whole number                 | `3`                          |                                       |
-| `round_void_count` | Decimal     | Number with up to 2 decimals | `10.5` or `"10.50"`          |                                       |
-| `slim_void_count`  | Decimal     | Number with up to 2 decimals | `8.2` or `"8.20"`            |                                       |
-| `enqueued_at`      | DateTime    | ISO 8601 format              | `"2026-02-12T03:58:59.495Z"` |                                       |
-| `azure_device_id`  | String      | Max 255 characters           | `"device123"`                | Azure IoT Hub device ID               |
-| `raw_payload`      | JSON Object | Any valid JSON               | `{"state": {...}}`           | Optional                              |
-| `created_at`       | DateTime    | ISO 8601 format (read-only)  | `"2026-02-12T04:00:00Z"`     | Auto-set, read-only                   |
+| Field              | Type        | Format                       | Example                                  | Notes                                |
+| ------------------ | ----------- | ---------------------------- | ---------------------------------------- | ------------------------------------ |
+| `id`               | Integer     | Auto-generated               | `1`                                      | Read-only                            |
+| `device_id`        | UUID        | UUID v4                      | `"550e8400-e29b-41d4-a716-446655440000"` | Auto-populated from device lookup    |
+| `round_count`      | Integer     | Whole number                 | `5`                                      |                                      |
+| `slim_count`       | Integer     | Whole number                 | `3`                                      |                                      |
+| `round_void_count` | Decimal     | Number with up to 2 decimals | `10.5` or `"10.50"`                      |                                      |
+| `slim_void_count`  | Decimal     | Number with up to 2 decimals | `8.2` or `"8.20"`                        |                                      |
+| `enqueued_at`      | DateTime    | ISO 8601 format              | `"2026-02-12T03:58:59.495Z"`             |                                      |
+| `azure_device_id`  | String      | Max 255 characters           | `"device123"`                            | Azure IoT Hub device ID (lookup key) |
+| `raw_payload`      | JSON Object | Any valid JSON               | `{"state": {...}}`                       | Optional                             |
+| `created_at`       | DateTime    | ISO 8601 format (read-only)  | `"2026-02-12T04:00:00Z"`                 | Auto-set, read-only                  |

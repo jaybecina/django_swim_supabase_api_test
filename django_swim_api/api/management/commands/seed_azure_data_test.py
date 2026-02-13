@@ -21,12 +21,19 @@ class Command(BaseCommand):
         months = options["months"]
         per_day = options["per_day"]
         
-        # Use actual user IDs and device names from Supabase
-        VALID_USER_IDS = [
-            "e185e548-7301-45d4-9bb0-e89d489da851",
-            "ca610bad-8b30-44ee-8953-9bdc9cd646f5"
-        ]
-        VALID_DEVICE_IDS = ["device-001", "device-002", "device-003"]
+        # Fetch existing devices from Supabase
+        try:
+            devices_response = supabase.table("devices").select("id, azure_device_id").execute()
+            devices = devices_response.data
+            
+            if not devices:
+                self.stderr.write(self.style.ERROR("No devices found in database. Please create devices first."))
+                return
+            
+            self.stdout.write(f"Found {len(devices)} devices in database")
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"Error fetching devices: {e}"))
+            return
 
         now = datetime.now(timezone.utc)
         # compute start date months back
@@ -43,14 +50,28 @@ class Command(BaseCommand):
                 dt = datetime.combine(current, datetime.min.time()).replace(tzinfo=timezone.utc)
                 # random time during day
                 dt = dt + timedelta(seconds=random.randint(0, 86399))
-                payload = {
-                    "user_id": random.choice(VALID_USER_IDS),
+                
+                # Select random device
+                device = random.choice(devices)
+                
+                # Create raw payload for JSONB storage
+                raw_payload = {
                     "round_count": random.randint(0, 100),
                     "slim_count": random.randint(0, 100),
                     "round_void_count": float(f"{random.uniform(0, 20):.2f}"),
                     "slim_void_count": float(f"{random.uniform(0, 20):.2f}"),
+                    "timestamp": dt.isoformat()
+                }
+                
+                payload = {
+                    "device_id": device["id"],  # UUID reference to devices table
+                    "azure_device_id": device["azure_device_id"],  # denormalized for fast filtering
+                    "round_count": raw_payload["round_count"],
+                    "slim_count": raw_payload["slim_count"],
+                    "round_void_count": raw_payload["round_void_count"],
+                    "slim_void_count": raw_payload["slim_void_count"],
                     "enqueued_at": dt.isoformat(),
-                    "azure_device_id": random.choice(VALID_DEVICE_IDS)
+                    "raw_payload": raw_payload
                 }
                 to_insert.append(payload)
             current = current + timedelta(days=1)

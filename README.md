@@ -88,7 +88,6 @@ The API will be available at `http://127.0.0.1:8000/`
 
 ```json
 {
-  "device_id": 1,
   "round_count": 5,
   "slim_count": 3,
   "round_void_count": 10.5,
@@ -99,7 +98,7 @@ The API will be available at `http://127.0.0.1:8000/`
 }
 ```
 
-**Note:** `device_id` must exist in the `devices` table. `raw_payload` is optional.
+**Note:** `azure_device_id` must exist in the `devices` table (device lookup is performed automatically). `device_id` is auto-populated in the response. `raw_payload` is optional.
 
 ### Management Commands
 
@@ -167,16 +166,16 @@ curl -X POST 'https://your-project.supabase.co/functions/v1/azure-stream-data' \
 
 The Azure telemetry is stored with the following mapping:
 
-| Device Field                  | Database Column    | Type      | Required |
-| ----------------------------- | ------------------ | --------- | -------- |
-| devices table lookup          | `device_id`        | bigint    | ✓        |
-| `iothub-connection-device-id` | `azure_device_id`  | varchar   | ✓        |
-| `state.totalRoundCount`       | `round_count`      | integer   | ✓        |
-| `state.totalSlimCount`        | `slim_count`       | integer   | ✓        |
-| `state.totalVoidRoundMl`      | `round_void_count` | decimal   | ✓        |
-| `state.totalVoidSlimMl`       | `slim_void_count`  | decimal   | ✓        |
-| `iothub-enqueuedtime`         | `enqueued_at`      | timestamp | ✓        |
-| Decoded body                  | `raw_payload`      | jsonb     | ✗        |
+| Device Field                  | Database Column    | Type      | Required | Notes                                          |
+| ----------------------------- | ------------------ | --------- | -------- | ---------------------------------------------- |
+| devices table lookup          | `device_id`        | uuid      | Auto     | Auto-populated by looking up `azure_device_id` |
+| `iothub-connection-device-id` | `azure_device_id`  | varchar   | ✓        | Azure IoT Hub device ID (lookup key)           |
+| `state.totalRoundCount`       | `round_count`      | integer   | ✓        |                                                |
+| `state.totalSlimCount`        | `slim_count`       | integer   | ✓        |                                                |
+| `state.totalVoidRoundMl`      | `round_void_count` | decimal   | ✓        |                                                |
+| `state.totalVoidSlimMl`       | `slim_void_count`  | decimal   | ✓        |                                                |
+| `iothub-enqueuedtime`         | `enqueued_at`      | timestamp | ✓        |                                                |
+| Decoded body                  | `raw_payload`      | jsonb     | ✗        | Optional                                       |
 
 ### Deactivate Virtual Environment
 
